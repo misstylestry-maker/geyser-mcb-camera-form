@@ -1,0 +1,337 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload Geyser MCB Image</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 14px;
+  background: #f0effb;
+  font-family: Arial, sans-serif;
+  color: #202124;
+}
+
+.card {
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 20px 18px;
+  background: white;
+  border: 1px solid #dadce0;
+  border-radius: 7px;
+}
+
+.header {
+  border-top: 8px solid #5946e8;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 23px;
+}
+
+.description {
+  font-size: 13px;
+  color: #555;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.required { color: #d93025; }
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: white;
+  font-size: 16px;
+}
+
+input[readonly] { background: #f8f9fa; }
+
+button {
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 4px;
+  background: #5946e8;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.full { width: 100%; margin-top: 10px; }
+
+video, #preview {
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 6px;
+  background: #eee;
+}
+
+#status {
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.small {
+  font-size: 12px;
+  color: #666;
+}
+
+[hidden] { display: none !important; }
+</style>
+</head>
+
+<body>
+
+<div class="card header">
+  <h2>Upload Geyser MCB Image</h2>
+  <p class="description">
+    Enter the task details, capture the photo and submit the form.
+  </p>
+  <p class="small">* Indicates required question</p>
+</div>
+
+<form id="taskForm">
+
+  <div class="card">
+    <label for="taskId">
+      Task ID <span class="required">*</span>
+    </label>
+    <input id="taskId" required readonly>
+  </div>
+
+  <div class="card">
+    <label for="taskName">
+      Task Name <span class="required">*</span>
+    </label>
+    <input id="taskName" required readonly>
+  </div>
+
+  <div class="card">
+    <label>
+      Upload geyset MCB image
+      <span class="required">*</span>
+    </label>
+
+    <p class="small">
+      Tap Open Camera to take a new photo. Gallery and file selection are not provided.
+    </p>
+
+    <button type="button" id="start" class="full">
+      Open Camera
+    </button>
+
+    <video id="video" autoplay playsinline hidden></video>
+
+    <button type="button" id="capture" class="full" hidden>
+      Capture Photo
+    </button>
+
+    <img id="preview" alt="Captured photo preview" hidden>
+
+    <button type="button" id="retake" class="full" hidden>
+      Retake Photo
+    </button>
+
+    <p id="photoStatus" class="small">No photo captured yet.</p>
+  </div>
+
+  <div class="card">
+    <label for="music">
+      Is music on? <span class="required">*</span>
+    </label>
+
+    <select id="music" required>
+      <option value="">Choose</option>
+      <option value="Yes">Yes</option>
+      <option value="No">No</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <button type="submit" id="submit" disabled>
+      Submit
+    </button>
+    <p id="status" role="status"></p>
+  </div>
+
+</form>
+
+<script>
+// IMPORTANT: Replace this with your Apps Script Web App URL ending in /exec.
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPqWRjB0Z89KEMXd73QUfkG40L2T9wCZsijDj1AmlcRH8GphwlSTSZ-SqBfgxQHQIT/exec";
+
+const params = new URLSearchParams(window.location.search);
+
+document.getElementById("taskId").value =
+  params.get("taskId") || "";
+
+document.getElementById("taskName").value =
+  params.get("taskName") || "";
+
+const video = document.getElementById("video");
+const preview = document.getElementById("preview");
+const captureButton = document.getElementById("capture");
+const retakeButton = document.getElementById("retake");
+const submitButton = document.getElementById("submit");
+const statusBox = document.getElementById("status");
+const photoStatus = document.getElementById("photoStatus");
+
+let cameraStream = null;
+let photoBase64 = "";
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+}
+
+async function openCamera() {
+  try {
+    stopCamera();
+
+    photoBase64 = "";
+    submitButton.disabled = true;
+    preview.hidden = true;
+    retakeButton.hidden = true;
+    captureButton.hidden = true;
+    video.hidden = true;
+
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+      throw new Error("Open this page using HTTPS in a supported browser.");
+    }
+
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    });
+
+    video.srcObject = cameraStream;
+    video.hidden = false;
+    captureButton.hidden = false;
+    photoStatus.textContent = "Camera is ready.";
+    statusBox.textContent = "";
+
+    await video.play();
+
+  } catch (error) {
+    stopCamera();
+    statusBox.textContent =
+      "Camera could not open. Allow camera permission and open this HTTPS page in your browser. Details: " +
+      error.message;
+  }
+}
+
+document.getElementById("start").addEventListener("click", openCamera);
+retakeButton.addEventListener("click", openCamera);
+
+captureButton.addEventListener("click", () => {
+  if (!video.videoWidth) {
+    photoStatus.textContent = "Please wait for the camera preview.";
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  const scale = Math.min(1, 1280 / video.videoWidth);
+
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+
+  const context = canvas.getContext("2d");
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  photoBase64 = canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
+
+  preview.src = "data:image/jpeg;base64," + photoBase64;
+  preview.hidden = false;
+  video.hidden = true;
+  captureButton.hidden = true;
+  retakeButton.hidden = false;
+
+  stopCamera();
+
+  submitButton.disabled = false;
+  photoStatus.textContent = "Photo captured. Check the preview.";
+});
+
+document.getElementById("taskForm").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const taskId = document.getElementById("taskId").value.trim();
+  const taskName = document.getElementById("taskName").value.trim();
+  const musicOn = document.getElementById("music").value;
+
+  if (!taskId || !taskName) {
+    statusBox.textContent =
+      "Task ID or Task Name is missing. Open the correct task link.";
+    return;
+  }
+
+  if (!photoBase64) {
+    statusBox.textContent = "Please capture a photo first.";
+    return;
+  }
+
+  if (!musicOn) {
+    statusBox.textContent = "Please select Yes or No for Is music on?";
+    return;
+  }
+
+  if (WEB_APP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+    statusBox.textContent =
+      "Please add your Apps Script Web App URL to the code first.";
+    return;
+  }
+
+  submitButton.disabled = true;
+  statusBox.textContent = "Submitting. Please wait...";
+
+  try {
+    await fetch(WEB_APP_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        taskId: taskId,
+        taskName: taskName,
+        photo: photoBase64,
+        musicOn: musicOn
+      })
+    });
+
+    statusBox.textContent =
+      "Submission request sent. Please verify the new row in Google Sheets before submitting again.";
+
+  } catch (error) {
+    statusBox.textContent =
+      "Could not send the request. Check your internet connection and try again.";
+    submitButton.disabled = false;
+  }
+});
+
+window.addEventListener("pagehide", stopCamera);
+</script>
+
+</body>
+</html>
